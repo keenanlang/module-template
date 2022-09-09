@@ -1,0 +1,38 @@
+# auto-compute location of this file.
+# Necessary for dependency resolution
+_@MODULE@ := $(dir $(lastword $(MAKEFILE_LIST)))
+
+# we're appending so must be idempotent
+ifeq (,$(_@MODULE@_CONF_INCLUDED))
+_@MODULE@_CONF_INCLUDED := YES
+
+define  INCLUDE_ALL
+  -include $(1)
+  -include $(1).$(EPICS_HOST_ARCH)
+  -include $(1).$(EPICS_HOST_ARCH).Common
+  -include $(1).Common.$(T_A)
+  -include $(1).$(EPICS_HOST_ARCH).$(T_A)
+endef
+
+ifdef T_A
+
+_@MODULE@_DEPENDENT_MODULES := $(shell $(CONVERTRELEASE) -T $(_@MODULE@)/.. releaseTops)
+_@MODULE@_DEPENDENT_MODULES := $(filter-out EPICS_BASE SUPPORT, $(_@MODULE@_DEPENDENT_MODULES))
+
+_@MODULE@_SUBMODULES := $(filter-out $(_@MODULE@)/@MODULE@ , $(wildcard $(_@MODULE@)/@MODULE@_*))
+_@MODULE@_SUBMODULES := $(filter-out $(wildcard *.$(EPICS_HOST_ARCH)*), $(_@MODULE@_SUBMODULES))
+_@MODULE@_SUBMODULES := $(filter-out $(wildcard *.Common*), $(_@MODULE@_SUBMODULES))
+
+$(foreach mod, $(_@MODULE@_DEPENDENT_MODULES), $(eval -include $($(mod))/cfg/CONFIG_MODULE))
+
+$(eval $(call INCLUDE_ALL,$(_@MODULE@)/@MODULE@))
+
+$(foreach submod, $(_@MODULE@_SUBMODULES), $(eval $(call INCLUDE_ALL,$(submod))))
+
+ALL_IOC_DBDS += $(@MODULE@_IOC_DBDS)
+ALL_IOC_LIBS := $(@MODULE@_IOC_LIBS) $(ALL_IOC_LIBS)
+ALL_IOC_SYS_LIBS := $(@MODULE@_IOC_SYS_LIBS) $(ALL_IOC_SYS_LIBS)
+
+endif #T_A
+
+endif # included
